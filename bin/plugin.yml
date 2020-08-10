@@ -1,0 +1,10 @@
+main: MinecraftCasinoPlugin.Main
+name: MinecraftCasinoPlugin
+version: 1.0
+author: me
+api-version: 1.16
+
+commands:
+  Hello:
+  Roulette:
+  Casino:
