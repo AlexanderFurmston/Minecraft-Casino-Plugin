@@ -8,25 +8,37 @@ import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import io.netty.util.internal.ThreadLocalRandom;
 import net.md_5.bungee.api.ChatColor;
 
-public class Main extends JavaPlugin {
+public class Main extends JavaPlugin implements Listener{
 	
 	List<Inventory> invs = new ArrayList<Inventory>();
 	public static ItemStack[] contents;
 	private int itemIndex = 0;
 	
+	List<Location> rouletteLocations = new ArrayList<Location>();
+	
 	@Override
 	public void onEnable() {
 		// runs on startup, reload, plugin reload
 	     //getServer().getPluginManager().registerEvents(new MyListener(), this);
+		this.getServer().getPluginManager().registerEvents(this, this);
+		
+		//writes config.yml to data folder
+		this.saveDefaultConfig();
+		//gets the roulette seat locations and puts them in a list
+		rouletteLocations = (List<Location>) this.getConfig().getList("roulette.seats");
 	}
 	
 	
@@ -59,13 +71,13 @@ public class Main extends JavaPlugin {
 			if (sender instanceof Player) { 
 				Player player = (Player) sender;
 				if (player.hasPermission("casino.roulette")) {
-					Location leaf = new Location(player.getWorld(), (double) 196.5, (double) 70, (double)700.5 );
-					double distance = player.getLocation().distance(leaf);
-					if (distance < 1.1) {
+					if (checkRouletteLocation(player.getLocation())) {
+						
 						if (args.length == 0) {
 							//roulette
-							player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&a" + Double.toString(distance)) );
+							player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&aYou are seated. Now try /roulette <bet amount> <colour>") );
 							return true;
+							
 						} else if (args.length == 2) {
 							//roulette <fee>
 							if (isInteger(args[0]) && (args[1].equalsIgnoreCase("green") || args[1].equalsIgnoreCase("black") || args[1].equalsIgnoreCase("red"))) {
@@ -79,29 +91,38 @@ public class Main extends JavaPlugin {
 									return true;
 								} else {
 									player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cYou need more diamonds than that to gamble that amount."));
+									return true;
 								}
 							}
 						}
+						
+						player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cWrong command, try /roulette <bet amount> <bet colour>."));
+						return true;
 					} else {
-						player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&c" + Double.toString(distance)) );
+						player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&cYou need to sit at the roulette table for that.") );
 						return true;
 					}
 				}
 			}
 			
-		} else if (label.equalsIgnoreCase("casino.*")) {
+		} else if (label.equalsIgnoreCase("casino")) {
 			// /casino <set/locate> <position> <game>
 			if (sender instanceof Player) { 
 				Player player = (Player) sender;
-				if (sender.hasPermission("funkeypigeon."))
-				if (args.length == 0) {
+				if (player.hasPermission("casino.admin")) {
+					if (args.length == 3) {
+						if (args[0].equalsIgnoreCase("set") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("roulette")) {
+							saveRouletteLocation(player.getLocation());
+							return true;
+						} else if (args[0].equalsIgnoreCase("locate") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("roulette")) {
+							player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6There are roulette seats at the following locations:"));
+							for(Location location: rouletteLocations) {
+								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "X: &r" + Double.toString(location.getX()) + " &6Y: &r" + Double.toString(location.getY()) + " &6Z: &r" + Double.toString(location.getZ())) );
+							}
+							return true;
+						}
+					}
 					player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cThat's not how to use this command, try /casino <set/locate> <position> <game>"));
-					return true;
-				} else if (args[0].equals("locate")) {
-					player.sendMessage("I don't know where that is at the moment");
-					return true;
-				} else if (args[0].equals("set")) {
-					player.sendMessage("I don't know how to do that yet");
 					return true;
 				}
 			}
@@ -224,5 +245,32 @@ public class Main extends JavaPlugin {
 			}
 			
 		}.runTaskTimer(this, 0, 2);
+	}
+	
+	
+	@EventHandler
+	public void onClick(InventoryClickEvent event) {
+		if (!invs.contains(event.getInventory())) {
+			return;
+		} else {
+			event.setCancelled(true);
+			return; 
+		}
+	}
+	
+	
+	public void saveRouletteLocation(Location location) {
+		rouletteLocations.add(location);
+		this.getConfig().set("roulette.seats", rouletteLocations);
+		this.saveConfig();
+	}
+	
+	public boolean checkRouletteLocation(Location location) {
+		for (Location seat : rouletteLocations) {
+			if (seat.distance(location) < 1.1) {
+				return true;
+			}
+		}
+		return false;
 	}
 }
