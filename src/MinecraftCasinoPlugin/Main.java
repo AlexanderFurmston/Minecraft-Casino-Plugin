@@ -213,24 +213,22 @@ public class Main extends JavaPlugin implements Listener{
 								//check the bet and outcome, then allocate rewards
 								ItemStack item = inv.getItem(13);
 								ItemStack betItem;
-								ItemStack reward;
+								Integer reward;
 								if (bet.equals("red")) {
 									betItem = new ItemStack(Material.RED_WOOL, 2);
-									reward = new ItemStack(Material.DIAMOND, fee*2);
+									reward = fee * 2;
 								} else if (bet.equals("black")) {
 									betItem = new ItemStack(Material.BLACK_WOOL, 2);
-									reward = new ItemStack(Material.DIAMOND, fee*2);
+									reward = fee * 2;
 								} else {
 									betItem = new ItemStack(Material.GREEN_WOOL);
-									reward = new ItemStack(Material.DIAMOND, fee*35);
+									reward = fee * 35;
 								}
 								
 								if (item.equals(betItem)) {
-									player.getInventory().addItem(reward);
-									player.updateInventory();
-									player.closeInventory();
+									giveItems(Material.DIAMOND, reward, player);
 									cancel();
-									Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', player.getDisplayName() + "&6 won £" + Integer.toString(reward.getAmount()) + "&6!" ));
+									Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', player.getDisplayName() + "&6 won £" + Integer.toString(reward) + "&6!" ));
 								} else {
 									player.closeInventory();
 									cancel();
@@ -271,5 +269,25 @@ public class Main extends JavaPlugin implements Listener{
 			}
 		}
 		return false;
+	}
+	
+	
+	public void giveItems(Material material, Integer amount, Player player) {
+		if (amount <= 64) {
+			ItemStack items = new ItemStack(material, amount);
+			player.getInventory().addItem(items);
+			player.updateInventory();
+		} else {
+			Integer i = 0;
+			while (amount - i >= 64) {
+				ItemStack items = new ItemStack(material, 64);
+				player.getInventory().addItem(items);
+				player.updateInventory();
+				i = i + 64;
+			}
+			ItemStack items = new ItemStack(material, amount - i);
+			player.getInventory().addItem(items);
+			player.updateInventory();
+		}
 	}
 }

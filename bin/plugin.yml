@@ -1,7 +1,7 @@
 main: MinecraftCasinoPlugin.Main
 name: MinecraftCasinoPlugin
-version: 1.0
-author: me
+version: 1.0.1
+author: funkeypigeon
 api-version: 1.16
 
 commands:
