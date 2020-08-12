@@ -84,7 +84,7 @@ public class Main extends JavaPlugin implements Listener{
 								fee.setAmount(Integer.parseInt(args[0]));
 								if ((player.getInventory().getItemInMainHand().getAmount() >= (Integer.parseInt(args[0]))) && player.getInventory().getItemInMainHand().isSimilar(fee)) {
 									player.getInventory().removeItem(fee);
-									Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', player.getDisplayName() + "&6 is gambling £" + args[0] + "&6 on roulette!"));
+									Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', player.getDisplayName() + "&6 is gambling £" + args[0] + "&6 on " + args[1] + "&6 !"));
 									//spin the GUI
 									spin(player, Integer.parseInt(args[0]), args[1]);
 									return true;
@@ -221,7 +221,7 @@ public class Main extends JavaPlugin implements Listener{
 									betItem = new ItemStack(Material.BLACK_WOOL, 2);
 									reward = fee * 2;
 								} else {
-									betItem = new ItemStack(Material.GREEN_WOOL);
+									betItem = new ItemStack(Material.GREEN_WOOL, 35);
 									reward = fee * 35;
 								}
 								
