@@ -2,6 +2,7 @@ package MinecraftCasinoPlugin;
 
 import java.util.*;
 
+
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -20,6 +21,9 @@ import org.bukkit.scheduler.BukkitRunnable;
 import io.netty.util.internal.ThreadLocalRandom;
 import net.md_5.bungee.api.ChatColor;
 
+import MinecraftCasinoPlugin.BlackjackSeat;
+import MinecraftCasinoPlugin.Card;
+
 public class Main extends JavaPlugin implements Listener{
 	
 	List<Inventory> invs = new ArrayList<Inventory>();
@@ -27,6 +31,7 @@ public class Main extends JavaPlugin implements Listener{
 	private int itemIndex = 0;
 	
 	List<Location> rouletteLocations = new ArrayList<Location>();
+	List<BlackjackSeat> blackjackLocations = new ArrayList<BlackjackSeat>();
 	
 	@Override
 	public void onEnable() {
@@ -38,6 +43,7 @@ public class Main extends JavaPlugin implements Listener{
 		this.saveDefaultConfig();
 		//gets the roulette seat locations and puts them in a list
 		rouletteLocations = (List<Location>) this.getConfig().getList("roulette.seats");
+		blackjackLocations = (List<BlackjackSeat>) this.getConfig().getList("blackjack.seats");
 	}
 	
 	
@@ -103,14 +109,27 @@ public class Main extends JavaPlugin implements Listener{
 					}
 				}
 			}
+		} else if (label.equalsIgnoreCase("blackjack")) {
+			if (sender instanceof Player) {
+				Player player = (Player) sender;
+				if (player.hasPermission("casino.blackjack")) {
+					if (args.length == 1) {
+						
+					}
+				}
+				player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&cYou need to sit at the roulette table for that.") );
+				return true;
+			}
 			
 		} else if (label.equalsIgnoreCase("casino")) {
 			// /casino <set/locate> <position> <game>
+			// for blackjack: /casino <set/locate> <position> <tableID>
 			if (sender instanceof Player) { 
 				Player player = (Player) sender;
 				if (player.hasPermission("casino.admin")) {
 					if (args.length == 3) {
 						if (args[0].equalsIgnoreCase("set") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("roulette")) {
+							player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6Seat set for blackjack."));
 							saveRouletteLocation(player.getLocation());
 							return true;
 						} else if (args[0].equalsIgnoreCase("locate") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("roulette")) {
@@ -119,9 +138,20 @@ public class Main extends JavaPlugin implements Listener{
 								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "X: &r" + Double.toString(location.getX()) + " &6Y: &r" + Double.toString(location.getY()) + " &6Z: &r" + Double.toString(location.getZ())) );
 							}
 							return true;
+						} else if (args[0].equalsIgnoreCase("locate") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("blackjack")) {
+							player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6There are blackjack seats at the following locations:"));
+							for(BlackjackSeat seat: blackjackLocations) {
+								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "X: &r" + Double.toString(seat.getLocation().getX()) + " &6Y: &r" + Double.toString(seat.getLocation().getY()) + " &6Z: &r" + Double.toString(seat.getLocation().getZ())) );
+							}
+							return true;
+						}
+					} else if (args.length == 4) {
+						if (args[0].equalsIgnoreCase("set") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("blackjack") && isInteger(args[3])) {
+							player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6Seat set for blackjack."));
+							saveBlackjackLocation(player.getLocation(), Integer.parseInt(args[3]));
 						}
 					}
-					player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cThat's not how to use this command, try /casino <set/locate> <position> <game>"));
+					player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cThat's not how to use this command, try /casino <set/locate> <position> <game>. For blackjack include fourth argument tableID"));
 					return true;
 				}
 			}
@@ -265,6 +295,22 @@ public class Main extends JavaPlugin implements Listener{
 	public boolean checkRouletteLocation(Location location) {
 		for (Location seat : rouletteLocations) {
 			if (seat.distance(location) < 1.1) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	public void saveBlackjackLocation(Location location, Integer tableID) {
+		BlackjackSeat seat = new BlackjackSeat(location, tableID);
+		blackjackLocations.add(seat);
+		this.getConfig().set("blackjack.seats", blackjackLocations);
+		this.saveDefaultConfig();
+	}
+	
+	public boolean checkBlackjackLocation(Location location) {
+		for (BlackjackSeat seat: blackjackLocations) {
+			if (seat.getLocation().distance(location) < 1.1) {
 				return true;
 			}
 		}
