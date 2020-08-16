@@ -6,21 +6,26 @@ import java.util.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.block.Chest;
+import org.bukkit.block.DoubleChest;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.craftbukkit.libs.org.apache.commons.lang3.ArrayUtils;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import io.netty.util.internal.ThreadLocalRandom;
 import net.md_5.bungee.api.ChatColor;
-
+import net.minecraft.server.v1_16_R1.Block;
 import MinecraftCasinoPlugin.BlackjackSeat;
 import MinecraftCasinoPlugin.Card;
 
@@ -32,6 +37,11 @@ public class Main extends JavaPlugin implements Listener{
 	
 	List<Location> rouletteLocations = new ArrayList<Location>();
 	List<BlackjackSeat> blackjackLocations = new ArrayList<BlackjackSeat>();
+	List<ItemStack> cardsList = new ArrayList<ItemStack>();
+	LinkedHashMap<Integer, BlackjackGame> blackjackGames = new LinkedHashMap<Integer, BlackjackGame>();
+	LinkedHashMap<String, Integer> blackjackPlayerLocations = new LinkedHashMap<String, Integer>();
+	ItemStack[] cards;
+	ItemStack[] chest;
 	
 	@Override
 	public void onEnable() {
@@ -41,9 +51,14 @@ public class Main extends JavaPlugin implements Listener{
 		
 		//writes config.yml to data folder
 		this.saveDefaultConfig();
-		//gets the roulette seat locations and puts them in a list
+		
+		//gets the roulette/blackjack seat locations and puts them in a list
 		rouletteLocations = (List<Location>) this.getConfig().getList("roulette.seats");
 		blackjackLocations = (List<BlackjackSeat>) this.getConfig().getList("blackjack.seats");
+		
+		//loads the cards from the config.yml into a list, then converts to ItemStack[]
+		cardsList = (List<ItemStack>) this.getConfig().get("cards");
+		cards = cardsList.toArray(new ItemStack[cardsList.size()]); //remove null?
 	}
 	
 	
@@ -101,7 +116,7 @@ public class Main extends JavaPlugin implements Listener{
 							}
 						}
 						
-						player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cWrong command, try /roulette <bet amount> <bet colour>."));
+						player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&cWrong command, try /roulette <bet amount> <bet colour>.") );
 						return true;
 					} else {
 						player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&cYou need to sit at the roulette table for that.") );
@@ -110,20 +125,43 @@ public class Main extends JavaPlugin implements Listener{
 				}
 			}
 		} else if (label.equalsIgnoreCase("blackjack")) {
+			// /blackjack <start/end/join>
 			if (sender instanceof Player) {
 				Player player = (Player) sender;
 				if (player.hasPermission("casino.blackjack")) {
-					if (args.length == 1) {
-						
+					Location playerLocation = player.getLocation();
+					if (args.length == 1 && checkBlackjackLocation(playerLocation)) {
+						if (args[0].equalsIgnoreCase("start")) {
+							//on /blackjack start, register a new blackjack game and add it to the list of blackjack games
+							BlackjackGame game = new BlackjackGame(player, cards);
+							Integer tableID = getBlackjackTableID(playerLocation);
+							this.getServer().getPluginManager().registerEvents(game, this);
+							blackjackGames.put(tableID, game);
+							blackjackPlayerLocations.put(player.getName(), tableID);
+							return true;
+						} else if (args[0].equalsIgnoreCase("join")) {
+							if (blackjackPlayerLocations.getOrDefault(player.getName(), null) != null) {
+								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&cYou're already in a Blackjack game. Type /blackjack <leave/end>, then try again.") );
+								return true;
+							} else {
+								//find out which table the player is sitting at, add them to it
+								BlackjackGame game = blackjackGames.get(getBlackjackTableID(playerLocation));
+								game.add(player);
+								return true;
+							}
+						} else if (args[0].equalsIgnoreCase("end")) {
+							
+						} else if (args[0].equalsIgnoreCase("leave")) {
+							
+						}
 					}
 				}
-				player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&cYou need to sit at the roulette table for that.") );
+				player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&cYou need to sit at the Blackjack table for that.") );
 				return true;
 			}
 			
 		} else if (label.equalsIgnoreCase("casino")) {
 			// /casino <set/locate> <position> <game>
-			// for blackjack: /casino <set/locate> <position> <tableID>
 			if (sender instanceof Player) { 
 				Player player = (Player) sender;
 				if (player.hasPermission("casino.admin")) {
@@ -135,20 +173,37 @@ public class Main extends JavaPlugin implements Listener{
 						} else if (args[0].equalsIgnoreCase("locate") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("roulette")) {
 							player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6There are roulette seats at the following locations:"));
 							for(Location location: rouletteLocations) {
-								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "X: &r" + Double.toString(location.getX()) + " &6Y: &r" + Double.toString(location.getY()) + " &6Z: &r" + Double.toString(location.getZ())) );
+								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&6X: &r" + Double.toString(location.getX()) + " &6Y: &r" + Double.toString(location.getY()) + " &6Z: &r" + Double.toString(location.getZ())) );
 							}
 							return true;
 						} else if (args[0].equalsIgnoreCase("locate") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("blackjack")) {
 							player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6There are blackjack seats at the following locations:"));
 							for(BlackjackSeat seat: blackjackLocations) {
-								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "X: &r" + Double.toString(seat.getLocation().getX()) + " &6Y: &r" + Double.toString(seat.getLocation().getY()) + " &6Z: &r" + Double.toString(seat.getLocation().getZ())) );
+								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&6ID: " + Integer.toString(seat.getTableID()) + " &6X: &r" + Double.toString(seat.getLocation().getX()) + " &6Y: &r" + Double.toString(seat.getLocation().getY()) + " &6Z: &r" + Double.toString(seat.getLocation().getZ())) );
 							}
 							return true;
-						}
-					} else if (args.length == 4) {
-						if (args[0].equalsIgnoreCase("set") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("blackjack") && isInteger(args[3])) {
+						} else if (args[0].equalsIgnoreCase("set") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("blackjack") && isInteger(args[3])) {
 							player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6Seat set for blackjack."));
 							saveBlackjackLocation(player.getLocation(), Integer.parseInt(args[3]));
+						}
+					} else if (args.length == 1) {
+						if (args[0].equalsIgnoreCase("savecards")) {
+							this.getConfig().set("cards", chest);
+							this.saveConfig();
+							cardsList = (List<ItemStack>) this.getConfig().get("cards");
+							cards = cardsList.toArray(new ItemStack[cardsList.size()]);
+						} else if (args[0].equalsIgnoreCase("loadcards")) {
+							//Integer i = 0;
+							for (Integer i = 0; i < cards.length; i++) {
+								ItemStack card;
+								if (cards[i] != null) {
+									card = cards[i];
+									if (card.getType() == Material.FILLED_MAP) {
+										player.getInventory().addItem(card);
+										player.updateInventory();
+									}
+								}
+							}
 						}
 					}
 					player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cThat's not how to use this command, try /casino <set/locate> <position> <game>. For blackjack include fourth argument tableID"));
@@ -201,7 +256,7 @@ public class Main extends JavaPlugin implements Listener{
 		//gold block indicators
 		ItemStack indicator = new ItemStack(Material.GOLD_BLOCK);
 		ItemMeta meta = indicator.getItemMeta();
-		meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&8|"));
+		meta.setDisplayName( ChatColor.translateAlternateColorCodes('&', "&8|") );
 		indicator.setItemMeta(meta);
 		inv.setItem(4, indicator);
 		inv.setItem(22, indicator);
@@ -258,11 +313,11 @@ public class Main extends JavaPlugin implements Listener{
 								if (item.equals(betItem)) {
 									giveItems(Material.DIAMOND, reward, player);
 									cancel();
-									Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', player.getDisplayName() + "&6 won £" + Integer.toString(reward) + "&6!" ));
+									Bukkit.broadcastMessage( ChatColor.translateAlternateColorCodes('&', player.getDisplayName() + "&6 won £" + Integer.toString(reward) + "&6!" ) );
 								} else {
 									player.closeInventory();
 									cancel();
-									Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', player.getDisplayName() + "&6 lost :("));
+									Bukkit.broadcastMessage( ChatColor.translateAlternateColorCodes('&', player.getDisplayName() + "&6 lost :(") );
 								}
 							}
 						}.runTaskLater(Main.getPlugin(Main.class), 50);
@@ -285,6 +340,19 @@ public class Main extends JavaPlugin implements Listener{
 		}
 	}
 	
+    @EventHandler
+    public void ChestSaves(PlayerInteractEvent event){
+    	//if player has relevant permissions, diamond in hand,
+    	//opens chest then save their inventory to a global variable so it can be saved to a config file using /casino savecards
+    	Chest block = (Chest) event.getClickedBlock().getState();
+        Player player = event.getPlayer();
+        //DoubleChest doubleChest;
+        if (block.getType() == Material.CHEST && player.getInventory().getItemInMainHand().getType() == Material.DIAMOND && player.hasPermission("casino.admin")){
+            chest = block.getInventory().getContents();
+            //chest = ArrayUtils.addAll((ItemStack[]) doubleChest.getLeftSide().getInventory().getContents(), (ItemStack[]) doubleChest.getRightSide().getInventory().getContents());
+        }
+    }
+	
 	
 	public void saveRouletteLocation(Location location) {
 		rouletteLocations.add(location);
@@ -305,7 +373,7 @@ public class Main extends JavaPlugin implements Listener{
 		BlackjackSeat seat = new BlackjackSeat(location, tableID);
 		blackjackLocations.add(seat);
 		this.getConfig().set("blackjack.seats", blackjackLocations);
-		this.saveDefaultConfig();
+		this.saveConfig();
 	}
 	
 	public boolean checkBlackjackLocation(Location location) {
@@ -315,6 +383,22 @@ public class Main extends JavaPlugin implements Listener{
 			}
 		}
 		return false;
+	}
+	
+	public Integer getBlackjackTableID(Location location) {
+		for (BlackjackSeat seat: blackjackLocations) {
+			if (seat.getLocation().distance(location) < 1.1) {
+				return seat.getTableID();
+			}
+		}
+		return 0;
+	}
+	
+	public static void endBlackjack(Player player) {
+		//get tableID using player name (player must be dealer from checks in /blackjack <leave/end> command
+		//go thru blackjackPlayerLocations and remove players from this tableID
+		//remove game from blackjackGames
+		//remove the cards from players' inventories
 	}
 	
 	

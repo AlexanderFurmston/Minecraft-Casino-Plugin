@@ -1,11 +1,17 @@
 package MinecraftCasinoPlugin;
 
-import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 public class Card {
 	Integer intVal;
-	public Card(Character value, String suit, Player owner, ItemStack map) {
+	Character value;
+	Character suit;
+	Inventory inventory;
+	String owner;
+	ItemStack map;
+	
+	public Card(Character value, Character suit, Inventory inventory, String owner, ItemStack map) {
 		if (isInteger(value)) {
 			this.intVal = Character.getNumericValue(value);
 		} else {
@@ -30,6 +36,31 @@ public class Card {
 		return this.intVal;
 	}
 	
+	public ItemStack getMap() {
+		return this.map;
+	}
+	
+	public String getOwner() {
+		return this.owner;
+	}
+	
+	//changes the value of an ace between 1 and 11 (and updates its name so the player knows)
+	public void changeAce() {
+		if (this.intVal == 1) {
+			this.intVal = 11;
+			this.map.getItemMeta().setDisplayName("11");
+		} else if (this.intVal == 11) {
+			this.intVal = 1;
+			this.map.getItemMeta().setDisplayName("1");
+		}
+	}
+	
+	public void changeOwner(String newOwner, Inventory newInv) {
+		this.owner = newOwner;
+		this.inventory = newInv;
+	}
+	
+	
 	public static boolean isInteger(Object object) { 
     	if(object instanceof Integer) { 
     		return true; 
@@ -37,8 +68,8 @@ public class Card {
     		Character theChar = object.toString().charAt(0);
     		 
     		try { 
-    			theChar.getNumericValue(theChar); 
-    		} catch(Exception e) { 
+    			theChar.getNumericValue(theChar);
+    		} catch(Exception e) {
     			return false; 
     		}	 
     	} 
