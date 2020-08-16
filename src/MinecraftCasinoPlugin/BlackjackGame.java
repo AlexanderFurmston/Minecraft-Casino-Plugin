@@ -19,7 +19,7 @@ public class BlackjackGame implements Listener {
 	LinkedHashMap<String, Card> deck = new LinkedHashMap<String, Card>();
 	Character[] suits = {'S', 'C', 'D', 'H'};
 	Character[] values = {'A', '2', '3', '4', '5', '6', '7', '8', '9', 'J', 'Q', 'K'};
-	List<Player> players = new ArrayList<Player>();
+	ArrayList<Player> players = new ArrayList<Player>();
 	ItemStack[] cards;
 	
 	public BlackjackGame(Player dealer, ItemStack[] cards) {
@@ -63,6 +63,14 @@ public class BlackjackGame implements Listener {
 		}
 	}
 	
+	public void undeal(Player player) {
+		for (ItemStack item : player.getInventory().getContents() ) {
+			if (item.getType().equals(Material.FILLED_MAP)) {
+				player.getInventory().remove(item);
+			}
+		}
+	}
+	
 	public void shuffle() {
 		LinkedHashMap<String, Card> newPack = new LinkedHashMap<String, Card>();
 		while (deck.size() > 0) {
@@ -78,6 +86,14 @@ public class BlackjackGame implements Listener {
 	
 	public Inventory getInventory() {
 		return this.inventory;
+	}
+	
+	public Player getDealer() {
+		return this.dealer;
+	}
+	
+	public ArrayList<Player> getPlayers() {
+		return this.players;
 	}
 	
 	@EventHandler

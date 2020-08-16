@@ -36,10 +36,10 @@ public class Main extends JavaPlugin implements Listener{
 	private int itemIndex = 0;
 	
 	List<Location> rouletteLocations = new ArrayList<Location>();
-	List<BlackjackSeat> blackjackLocations = new ArrayList<BlackjackSeat>();
+	static List<BlackjackSeat> blackjackLocations = new ArrayList<BlackjackSeat>();
 	List<ItemStack> cardsList = new ArrayList<ItemStack>();
-	LinkedHashMap<Integer, BlackjackGame> blackjackGames = new LinkedHashMap<Integer, BlackjackGame>();
-	LinkedHashMap<String, Integer> blackjackPlayerLocations = new LinkedHashMap<String, Integer>();
+	static LinkedHashMap<Integer, BlackjackGame> blackjackGames = new LinkedHashMap<Integer, BlackjackGame>();
+	static LinkedHashMap<UUID, Integer> blackjackPlayerLocations = new LinkedHashMap<UUID, Integer>();
 	ItemStack[] cards;
 	ItemStack[] chest;
 	
@@ -137,10 +137,11 @@ public class Main extends JavaPlugin implements Listener{
 							Integer tableID = getBlackjackTableID(playerLocation);
 							this.getServer().getPluginManager().registerEvents(game, this);
 							blackjackGames.put(tableID, game);
-							blackjackPlayerLocations.put(player.getName(), tableID);
+							blackjackPlayerLocations.put(player.getUniqueId(), tableID);
+							game.deal(player, 2);
 							return true;
 						} else if (args[0].equalsIgnoreCase("join")) {
-							if (blackjackPlayerLocations.getOrDefault(player.getName(), null) != null) {
+							if (blackjackPlayerLocations.getOrDefault(player.getUniqueId(), null) != null) {
 								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&cYou're already in a Blackjack game. Type /blackjack <leave/end>, then try again.") );
 								return true;
 							} else {
@@ -150,9 +151,24 @@ public class Main extends JavaPlugin implements Listener{
 								return true;
 							}
 						} else if (args[0].equalsIgnoreCase("end")) {
-							
+							Integer tableID = blackjackPlayerLocations.getOrDefault(player.getUniqueId(), 0);
+							if (tableID != 0 && blackjackGames.get(tableID).getDealer().getUniqueId().equals(player.getUniqueId())) {
+								endBlackjack(player);
+								return true;
+							} else {
+								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&cYou're not the dealer of a Blackjack game.") );
+								return true;
+							}
 						} else if (args[0].equalsIgnoreCase("leave")) {
-							
+							Integer tableID = blackjackPlayerLocations.getOrDefault(player.getUniqueId(), 0);
+							if (tableID != 0) {
+								blackjackGames.get(tableID).undeal(player);
+								endBlackjack(player);
+								return true;
+							} else {
+								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&cYou're not in a Blackjack game.") );
+								return true;
+							}
 						}
 					}
 				}
@@ -182,7 +198,9 @@ public class Main extends JavaPlugin implements Listener{
 								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&6ID: " + Integer.toString(seat.getTableID()) + " &6X: &r" + Double.toString(seat.getLocation().getX()) + " &6Y: &r" + Double.toString(seat.getLocation().getY()) + " &6Z: &r" + Double.toString(seat.getLocation().getZ())) );
 							}
 							return true;
-						} else if (args[0].equalsIgnoreCase("set") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("blackjack") && isInteger(args[3])) {
+						}
+					} else if (args.length == 4) {
+						if (args[0].equalsIgnoreCase("set") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("blackjack") && isInteger(args[3])) {
 							player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6Seat set for blackjack."));
 							saveBlackjackLocation(player.getLocation(), Integer.parseInt(args[3]));
 						}
@@ -206,7 +224,7 @@ public class Main extends JavaPlugin implements Listener{
 							}
 						}
 					}
-					player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cThat's not how to use this command, try /casino <set/locate> <position> <game>. For blackjack include fourth argument tableID"));
+					player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cThat's not how to use this command, try /casino <set/locate> <position> <game>. For setting blackjack seat include fourth argument tableID"));
 					return true;
 				}
 			}
@@ -385,7 +403,7 @@ public class Main extends JavaPlugin implements Listener{
 		return false;
 	}
 	
-	public Integer getBlackjackTableID(Location location) {
+	public static Integer getBlackjackTableID(Location location) {
 		for (BlackjackSeat seat: blackjackLocations) {
 			if (seat.getLocation().distance(location) < 1.1) {
 				return seat.getTableID();
@@ -394,11 +412,18 @@ public class Main extends JavaPlugin implements Listener{
 		return 0;
 	}
 	
-	public static void endBlackjack(Player player) {
+	public static void endBlackjack(Player dealer) {
 		//get tableID using player name (player must be dealer from checks in /blackjack <leave/end> command
-		//go thru blackjackPlayerLocations and remove players from this tableID
-		//remove game from blackjackGames
-		//remove the cards from players' inventories
+		Integer tableID = getBlackjackTableID(dealer.getLocation());
+		//go thru list of players, remove them from blackjackPlayerLocations and remove cards from their inventories
+		for (Player player : blackjackGames.get(tableID).getPlayers()) {
+			blackjackPlayerLocations.remove(player.getUniqueId());
+			for (ItemStack item : player.getInventory().getContents() ) {
+				if (item.getType().equals(Material.FILLED_MAP)) {
+					player.getInventory().remove(item);
+				}
+			}
+		}
 	}
 	
 	

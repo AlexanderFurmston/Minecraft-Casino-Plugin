@@ -1,5 +1,7 @@
 package MinecraftCasinoPlugin;
 
+import java.util.UUID;
+
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
