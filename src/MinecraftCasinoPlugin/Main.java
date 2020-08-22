@@ -2,10 +2,10 @@ package MinecraftCasinoPlugin;
 
 import java.util.*;
 
-
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.block.Chest;
 import org.bukkit.block.DoubleChest;
 import org.bukkit.command.Command;
@@ -29,15 +29,16 @@ import net.minecraft.server.v1_16_R1.Block;
 import MinecraftCasinoPlugin.BlackjackSeat;
 import MinecraftCasinoPlugin.Card;
 
-public class Main extends JavaPlugin implements Listener{
+public class Main extends JavaPlugin implements Listener {
 	
-	List<Inventory> invs = new ArrayList<Inventory>();
+	ArrayList<Inventory> invs = new ArrayList<Inventory>();
 	public static ItemStack[] contents;
 	private int itemIndex = 0;
 	
-	List<Location> rouletteLocations = new ArrayList<Location>();
-	static List<BlackjackSeat> blackjackLocations = new ArrayList<BlackjackSeat>();
-	List<ItemStack> cardsList = new ArrayList<ItemStack>();
+	ArrayList<Location> rouletteLocations = new ArrayList<Location>();
+	ArrayList<BlackjackSeat> blackjackLocations = new ArrayList<BlackjackSeat>();
+	ArrayList<ItemStack> cardsList = new ArrayList<ItemStack>();
+	ArrayList<Object> l = new ArrayList<Object>();
 	static LinkedHashMap<Integer, BlackjackGame> blackjackGames = new LinkedHashMap<Integer, BlackjackGame>();
 	static LinkedHashMap<UUID, Integer> blackjackPlayerLocations = new LinkedHashMap<UUID, Integer>();
 	ItemStack[] cards;
@@ -53,11 +54,17 @@ public class Main extends JavaPlugin implements Listener{
 		this.saveDefaultConfig();
 		
 		//gets the roulette/blackjack seat locations and puts them in a list
-		rouletteLocations = (List<Location>) this.getConfig().getList("roulette.seats");
-		blackjackLocations = (List<BlackjackSeat>) this.getConfig().getList("blackjack.seats");
+		rouletteLocations = (ArrayList<Location>) this.getConfig().getList("roulette.seats");
+		ArrayList<Object> l = (ArrayList<Object>) this.getConfig().getList("blackjack.seats");
+		for (Integer i = 0; i+1 < l.size(); i += 2) {
+			Location location = getLocationFromString((String) l.get(i));
+			Integer tableID = (Integer) l.get(i+1);
+			BlackjackSeat seat = new BlackjackSeat(location, tableID);
+			blackjackLocations.add(seat);
+		}
 		
 		//loads the cards from the config.yml into a list, then converts to ItemStack[]
-		cardsList = (List<ItemStack>) this.getConfig().get("cards");
+		cardsList = (ArrayList<ItemStack>) this.getConfig().get("cards");
 		cards = cardsList.toArray(new ItemStack[cardsList.size()]); //remove null?
 	}
 	
@@ -135,19 +142,24 @@ public class Main extends JavaPlugin implements Listener{
 							//on /blackjack start, register a new blackjack game and add it to the list of blackjack games
 							BlackjackGame game = new BlackjackGame(player, cards);
 							Integer tableID = getBlackjackTableID(playerLocation);
+							Bukkit.broadcastMessage("tableID" + tableID);
 							this.getServer().getPluginManager().registerEvents(game, this);
 							blackjackGames.put(tableID, game);
 							blackjackPlayerLocations.put(player.getUniqueId(), tableID);
 							game.deal(player, 2);
 							return true;
 						} else if (args[0].equalsIgnoreCase("join")) {
-							if (blackjackPlayerLocations.getOrDefault(player.getUniqueId(), null) != null) {
+							if (blackjackPlayerLocations.get(player.getUniqueId()) != null) {
 								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&cYou're already in a Blackjack game. Type /blackjack <leave/end>, then try again.") );
 								return true;
 							} else {
 								//find out which table the player is sitting at, add them to it
 								BlackjackGame game = blackjackGames.get(getBlackjackTableID(playerLocation));
+								Bukkit.broadcastMessage("game:" + game);
+								Bukkit.broadcastMessage("blackjackGames:" + blackjackGames.get(0) + blackjackGames.get(1));
+								Bukkit.broadcastMessage("tableID:" + getBlackjackTableID(playerLocation));
 								game.add(player);
+								blackjackPlayerLocations.put(player.getUniqueId(), getBlackjackTableID(playerLocation));
 								return true;
 							}
 						} else if (args[0].equalsIgnoreCase("end")) {
@@ -161,9 +173,10 @@ public class Main extends JavaPlugin implements Listener{
 							}
 						} else if (args[0].equalsIgnoreCase("leave")) {
 							Integer tableID = blackjackPlayerLocations.getOrDefault(player.getUniqueId(), 0);
+							Bukkit.broadcastMessage("bjloc" + blackjackLocations.get(0).getTableID());
 							if (tableID != 0) {
 								blackjackGames.get(tableID).undeal(player);
-								endBlackjack(player);
+								blackjackGames.get(tableID).remove(player, this);
 								return true;
 							} else {
 								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&cYou're not in a Blackjack game.") );
@@ -183,7 +196,7 @@ public class Main extends JavaPlugin implements Listener{
 				if (player.hasPermission("casino.admin")) {
 					if (args.length == 3) {
 						if (args[0].equalsIgnoreCase("set") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("roulette")) {
-							player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6Seat set for blackjack."));
+							player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6Seat set for roulette."));
 							saveRouletteLocation(player.getLocation());
 							return true;
 						} else if (args[0].equalsIgnoreCase("locate") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("roulette")) {
@@ -194,8 +207,13 @@ public class Main extends JavaPlugin implements Listener{
 							return true;
 						} else if (args[0].equalsIgnoreCase("locate") && args[1].equalsIgnoreCase("seat") && args[2].equalsIgnoreCase("blackjack")) {
 							player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6There are blackjack seats at the following locations:"));
-							for(BlackjackSeat seat: blackjackLocations) {
-								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&6ID: " + Integer.toString(seat.getTableID()) + " &6X: &r" + Double.toString(seat.getLocation().getX()) + " &6Y: &r" + Double.toString(seat.getLocation().getY()) + " &6Z: &r" + Double.toString(seat.getLocation().getZ())) );
+							for(BlackjackSeat seat : blackjackLocations) {
+								String ID = Integer.toString(seat.getTableID());
+								//String ID = seat.getValue();
+								String x = Double.toString(seat.getLocation().getX());
+								String y = Double.toString(seat.getLocation().getY());
+								String z = Double.toString(seat.getLocation().getZ());
+								player.sendMessage( ChatColor.translateAlternateColorCodes('&', "&6ID: " + ID + " &6X: &r" + x + " &6Y: &r" + y + " &6Z: &r" + z) );
 							}
 							return true;
 						}
@@ -208,7 +226,7 @@ public class Main extends JavaPlugin implements Listener{
 						if (args[0].equalsIgnoreCase("savecards")) {
 							this.getConfig().set("cards", chest);
 							this.saveConfig();
-							cardsList = (List<ItemStack>) this.getConfig().get("cards");
+							cardsList = (ArrayList<ItemStack>) this.getConfig().get("cards");
 							cards = cardsList.toArray(new ItemStack[cardsList.size()]);
 						} else if (args[0].equalsIgnoreCase("loadcards")) {
 							//Integer i = 0;
@@ -390,12 +408,15 @@ public class Main extends JavaPlugin implements Listener{
 	public void saveBlackjackLocation(Location location, Integer tableID) {
 		BlackjackSeat seat = new BlackjackSeat(location, tableID);
 		blackjackLocations.add(seat);
-		this.getConfig().set("blackjack.seats", blackjackLocations);
+		String loc = getStringFromLocation(location);
+		l.add(loc);
+		l.add(tableID);
+		this.getConfig().set("blackjack.seats", l);
 		this.saveConfig();
 	}
 	
 	public boolean checkBlackjackLocation(Location location) {
-		for (BlackjackSeat seat: blackjackLocations) {
+		for (BlackjackSeat seat : blackjackLocations) {
 			if (seat.getLocation().distance(location) < 1.1) {
 				return true;
 			}
@@ -403,29 +424,32 @@ public class Main extends JavaPlugin implements Listener{
 		return false;
 	}
 	
-	public static Integer getBlackjackTableID(Location location) {
-		for (BlackjackSeat seat: blackjackLocations) {
+	public Integer getBlackjackTableID(Location location) {
+		for (BlackjackSeat seat : blackjackLocations) {
 			if (seat.getLocation().distance(location) < 1.1) {
-				return seat.getTableID();
+				return seat.getTableID().intValue();
 			}
 		}
 		return 0;
 	}
 	
-	public static void endBlackjack(Player dealer) {
+	public void endBlackjack(Player dealer) {
 		//get tableID using player name (player must be dealer from checks in /blackjack <leave/end> command
 		Integer tableID = getBlackjackTableID(dealer.getLocation());
 		//go thru list of players, remove them from blackjackPlayerLocations and remove cards from their inventories
 		for (Player player : blackjackGames.get(tableID).getPlayers()) {
 			blackjackPlayerLocations.remove(player.getUniqueId());
 			for (ItemStack item : player.getInventory().getContents() ) {
-				if (item.getType().equals(Material.FILLED_MAP)) {
-					player.getInventory().remove(item);
+				try {
+					if (item == null) return;
+				} finally {
+					if (item.getType().equals(Material.FILLED_MAP)) {
+						player.getInventory().remove(item);
+					}
 				}
 			}
 		}
 	}
-	
 	
 	public void giveItems(Material material, Integer amount, Player player) {
 		if (amount <= 64) {
@@ -444,5 +468,29 @@ public class Main extends JavaPlugin implements Listener{
 			player.getInventory().addItem(items);
 			player.updateInventory();
 		}
+	}
+	
+	public static String getStringFromLocation(Location loc) {
+		if (loc == null) {
+			return "";
+		}
+		return loc.getWorld().getName() + ":" + loc.getX() + ":" + loc.getY() + ":" + loc.getZ() + ":" + loc.getYaw() + ":" + loc.getPitch() ;
+	}
+
+	public static Location getLocationFromString(String s) {
+		if (s == null || s.trim() == "") {
+			return null;
+		}
+		final String[] parts = s.split(":");
+		if (parts.length == 6) {
+			World w = Bukkit.getServer().getWorld(parts[0]);
+			double x = Double.parseDouble(parts[1]);
+			double y = Double.parseDouble(parts[2]);
+			double z = Double.parseDouble(parts[3]);
+			float yaw = Float.parseFloat(parts[4]);
+			float pitch = Float.parseFloat(parts[5]);
+			return new Location(w, x, y, z, yaw, pitch);
+		}
+		return null;
 	}
 }

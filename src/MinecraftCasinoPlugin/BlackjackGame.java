@@ -42,9 +42,9 @@ public class BlackjackGame implements Listener {
 		deal(player, 2);
 	}
 	
-	public void remove(Player player) {
+	public void remove(Player player, Main context) {
 		if (player.getName().equalsIgnoreCase(dealer.getName())) {
-			Main.endBlackjack(player);
+			context.endBlackjack(player);
 		} else {
 			players.remove(player);
 		}
@@ -56,7 +56,9 @@ public class BlackjackGame implements Listener {
 		for (Integer index = 0; dealt < amount; index++) {
 			String key = (String) deck.keySet().toArray()[index];
 			Card value = deck.get(key);
-			if (!value.getOwner().equalsIgnoreCase("table")) {
+			Bukkit.broadcastMessage("Value:" + value);
+			Bukkit.broadcastMessage("getOwner:" + value.getOwner());
+			if (value.getOwner().equalsIgnoreCase("table")) {
 				value.changeOwner(player.getName(), player.getInventory());
 				dealt++;
 			}
@@ -65,7 +67,8 @@ public class BlackjackGame implements Listener {
 	
 	public void undeal(Player player) {
 		for (ItemStack item : player.getInventory().getContents() ) {
-			if (item.getType().equals(Material.FILLED_MAP)) {
+			if (item == null) {
+			} else if (item.getType().equals(Material.FILLED_MAP)) {
 				player.getInventory().remove(item);
 			}
 		}

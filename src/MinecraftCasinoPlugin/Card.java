@@ -14,6 +14,11 @@ public class Card {
 	ItemStack map;
 	
 	public Card(Character value, Character suit, Inventory inventory, String owner, ItemStack map) {
+		this.value = value;
+		this.suit = suit;
+		this.inventory = inventory;
+		this.owner = owner;
+		this.map = map;
 		if (isInteger(value)) {
 			this.intVal = Character.getNumericValue(value);
 		} else {
@@ -46,6 +51,10 @@ public class Card {
 		return this.owner;
 	}
 	
+	public Inventory getInventory() {
+		return this.inventory;
+	}
+	
 	//changes the value of an ace between 1 and 11 (and updates its name so the player knows)
 	public void changeAce() {
 		if (this.intVal == 1) {
@@ -59,7 +68,9 @@ public class Card {
 	
 	public void changeOwner(String newOwner, Inventory newInv) {
 		this.owner = newOwner;
+		this.inventory.remove(map);
 		this.inventory = newInv;
+		this.inventory.addItem(map);
 	}
 	
 	
